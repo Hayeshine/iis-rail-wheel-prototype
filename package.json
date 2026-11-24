@@ -1,1 +1,10 @@
-{"name":"axis-rail-twin","version":"2.0.0","private":true,"type":"module","scripts":{"start":"python -m http.server 8080 --bind 127.0.0.1","test":"node --test"}}
+{
+  "name": "axis-rail-twin",
+  "version": "2.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "python -m http.server 8080 --bind 127.0.0.1",
+    "test": "node --test"
+  }
+}

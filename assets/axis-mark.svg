@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+ <title>AXIS rail wheel</title>
+ <circle cx="31" cy="27" r="20" stroke="#9DCDF0" stroke-width="3"/>
+ <circle cx="31" cy="27" r="6" stroke="#EAF5FF" stroke-width="3"/>
+ <path d="M31 7v14m0 12v14M13.7 17l12.1 7m10.4 6 12.1 7M13.7 37l12.1-7m10.4-6 12.1-7" stroke="#648EB5" stroke-width="2.5"/>
+ <path d="m45 13 6-5" stroke="#8CCFFF" stroke-width="2.5" stroke-linecap="round"/>
+ <circle cx="52" cy="7" r="3.5" fill="#8CCFFF"/>
+ <path d="M10 53h44M15 59h34" stroke="#9DCDF0" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

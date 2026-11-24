@@ -23,6 +23,44 @@ function update(){
  $('progress').textContent=`${state.verified.length} / 2 ACKNOWLEDGED`;$('finalize').disabled=!canFinalize(state,$('note').value)||!$('decision').value;
  $('verification-summary').textContent=`${state.requested.length} requested · ${state.verified.length} acknowledged. Explanation viewing is separate from inspection.`;
  $('decision-status').textContent=state.decision?`Recorded: ${state.decision.action.toUpperCase()} · verification ${state.decision.verificationStatus} · simulation only`:state.mode==='explore'&&state.verified.length<2?'Verification incomplete. Exploratory mode allows recording this explicitly.':'Select a diagnosis and disposition, add a rationale'+(state.mode==='guided'?' and acknowledge both checks.':'.');
+ updateDecisionSummary();
+ updateWorkflow();
+}
+// A suggested route, not a wizard: explanations are optional and choices stay revisable.
+function updateWorkflow(){
+ const chosen=state.candidate!==null,complete=state.verified.length===2,recorded=!!state.decision;
+ const viewed=history.some(event=>event.caseId===caseNumber&&event.action==='explanation_open');
+ const active=recorded?null:dialog.open?'explain':!chosen?'choose':state.mode==='explore'||complete?'record':'verify';
+ const steps={choose:chosen?'done':'pending',explain:viewed?'viewed':'optional',verify:complete?'done':state.mode==='explore'?'optional':'pending',record:recorded?'done':'pending'};
+ for(const [name,status] of Object.entries(steps)){
+  const el=$('workflow-step-'+name);el.dataset.state=name===active?'current':status;
+  if(name===active)el.setAttribute('aria-current','step');else el.removeAttribute('aria-current');
+ }
+ $('workflow-status-choose').textContent=chosen?'Selected':'Choose one';
+ $('workflow-status-explain').textContent=viewed?'Viewed · optional':'Optional';
+ $('workflow-status-verify').textContent=`${state.mode==='explore'?'Optional · ':''}${state.verified.length} / 2 acknowledged`;
+ $('workflow-status-record').textContent=recorded?'Recorded':!$('finalize').disabled?'Ready to record':chosen&&(state.mode==='explore'||complete)?'Add action and reason':'Waiting for your choice';
+ $('workflow-help').textContent=state.mode==='explore'?'Suggested route. You may skip independent checks in exploratory mode; incomplete verification will be recorded.':'Suggested route. Why is optional; guided mode requires both inspection acknowledgements. You can revisit your diagnosis.';
+}
+// Read the saved decision, rather than the disabled form, for the final receipt.
+function updateDecisionSummary(){
+ const record=state.decision,panel=$('decision-summary');
+ panel.hidden=!record;
+ if(!record){
+  panel.removeAttribute('data-verification');
+  for(const id of ['summary-context','summary-verification-title','summary-verification-detail','summary-diagnosis','summary-disposition','summary-checks','summary-rationale'])$(id).textContent='';
+  return;
+ }
+ const s=current(),complete=record.verificationStatus==='acknowledged';
+ const dispositions={hold:'Hold wheel for investigation',escalate:'Escalate to specialist',release:'Release in simulation'};
+ panel.dataset.verification=record.verificationStatus;
+ $('summary-context').textContent=`Case ${caseNumber} · ${s.name} · ${state.mode==='guided'?'Guided demo':'Exploratory simulation'}`;
+ $('summary-verification-title').textContent=complete?'Both inspection results acknowledged':'Verification incomplete';
+ $('summary-verification-detail').textContent=complete?'Acknowledgement records the operator’s action; it does not confirm a physical inspection or a diagnosis.':'This decision was recorded before both inspection results were acknowledged. It is not a fully checked diagnosis.';
+ $('summary-diagnosis').textContent=record.candidate==='uncertain'?'Evidence insufficient / neither confirmed':s.candidates[Number(record.candidate)].name;
+ $('summary-disposition').textContent=dispositions[record.action];
+ $('summary-checks').textContent=`${record.requested.length} of ${s.checks.length} requested · ${record.acknowledged.length} of ${s.checks.length} acknowledged`;
+ $('summary-rationale').textContent=record.note;
 }
 // Native dialog provides modal focus handling, keyboard Escape and focus restoration.
 let explanationIndex=null;
@@ -30,7 +68,7 @@ const dialog=$('explanation-dialog');
 function closeExplanation(reason='close_button'){
  if(!dialog.open)return;
  log('explanation_close','Closed diagnostic explanation',{candidateIndex:explanationIndex,reason});
- dialog.close();explanationIndex=null;
+ dialog.close();explanationIndex=null;updateWorkflow();
 }
 function openExplanation(index){
  const s=current(),c=s.candidates[index];explanationIndex=index;
@@ -44,6 +82,7 @@ function openExplanation(index){
  $('followup-answer').hidden=true;
  dialog.showModal();
  log('explanation_open','Opened diagnostic explanation: '+c.name,{candidateIndex:index,presentation:'dialog'});
+ updateWorkflow();
 }
 $('explanation-close').onclick=()=>closeExplanation();
 $('explanation-done').onclick=()=>closeExplanation('return_to_candidates');
@@ -62,7 +101,7 @@ $('explanation-verify').onclick=()=>{closeExplanation('go_to_verification');$('v
 
 function newCase(reason){closeExplanation('case_change');state=createState($('scenario').value,$('mode').value);caseNumber++;render();log('case_started',reason,{fixtureVersion:2});}
 $('scenario').onchange=()=>newCase('Loaded scenario: '+$('scenario').selectedOptions[0].textContent);$('mode').onchange=()=>newCase('Changed mode; started a fresh case.');$('reset').onclick=()=>newCase('Case reset; prior events retained under their original case ID.');$('note').oninput=update;$('decision').onchange=update;
-$('finalize').onclick=()=>{state=finalize(state,$('decision').value,$('note').value);log('decision_recorded',`Operator decision: ${state.decision.action.toUpperCase()} · verification ${state.decision.verificationStatus}`,state.decision);$('note').disabled=true;$('decision').disabled=true;document.querySelectorAll('[name=candidate],[data-check]').forEach(el=>el.disabled=true);update();};
+$('finalize').onclick=()=>{state=finalize(state,$('decision').value,$('note').value);log('decision_recorded',`Operator decision: ${state.decision.action.toUpperCase()} · verification ${state.decision.verificationStatus}`,state.decision);$('note').disabled=true;$('decision').disabled=true;document.querySelectorAll('[name=candidate],[data-check]').forEach(el=>el.disabled=true);update();$('decision-summary').focus({preventScroll:true});$('decision-summary').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'nearest'});};
 $('fault-marker').onclick=()=>{$('evidence').open=true;$('evidence').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'nearest'});log('marker','Inspected fault marker: '+stations[current().station]);};
 $('evidence').addEventListener('toggle',()=>{if($('evidence').open)log('evidence_open','Viewed scenario evidence');});
 $('export').onclick=()=>{log('export','Exported session log');const blob=new Blob([JSON.stringify({prototype:'AXIS Assignment 2',schemaVersion:2,simulation:true,notice:'Scripted teaching fixtures. Explanation opens and acknowledgements do not prove understanding. No measured automation-bias reduction.',history},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='axis-session.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);};
